@@ -1,0 +1,165 @@
+services:
+  kafka:
+    container_name: kafka
+    image: apache/kafka:latest
+    environment:
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 3
+    networks:
+      - my_network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - my_network
+
+  redis:
+    container_name: redis
+    image: redis:7
+    command: [ "redis-server", "--requirepass", "your_strong_password" ]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - my_network
+
+  redisinsight:
+    container_name: redisinsight
+    image: redis/redisinsight:latest
+    ports:
+      - "8001:8001"
+    environment:
+      - RI_APP_PORT=8001
+      - REDISINSIGHT_REDIS_HOST=redis
+      - REDISINSIGHT_REDIS_PORT=6379
+      - REDISINSIGHT_REDIS_USERNAME=
+      - REDISINSIGHT_REDIS_PASSWORD=your_strong_password
+    networks:
+      - my_network
+    depends_on:
+      - redis
+
+  postgres_auth:
+    container_name: postgres_auth
+    build:
+      context: .docker/postgres/auth
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: auth_db
+    volumes:
+      - auth_pg_data:/var/lib/postgresql/data
+    networks:
+      - my_network
+
+  postgres_product:
+    build:
+      context: .docker/postgres/product
+    container_name: postgres_product
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: product_db
+    volumes:
+      - product_pg_data:/var/lib/postgresql/data
+    networks:
+      - my_network
+
+  nginx:
+    container_name: nginx
+    build:
+      context: .docker/nginx
+    ports:
+      - "80:80"
+    depends_on:
+      - auth
+      - product
+    networks:
+      - my_network
+
+  auth:
+    container_name: auth
+    build:
+      context: .
+      dockerfile: .docker/auth/Dockerfile
+    volumes:
+      - ./services/auth:/app
+    working_dir: /app
+    command: yarn start:dev
+    ports:
+      - "3001:3000"
+    env_file:
+      - ./services/auth/.env
+    depends_on:
+      - postgres_auth
+      - kafka
+      - redis
+    networks:
+      - my_network
+
+  product:
+    container_name: product
+    build:
+      context: .
+      dockerfile: .docker/product/Dockerfile
+    volumes:
+      - ./services/product:/app
+    working_dir: /app
+    command: yarn start:dev
+    ports:
+      - "3002:3000"
+    env_file:
+      - ./services/product/.env
+    depends_on:
+      - postgres_product
+      - kafka
+      - redis
+    networks:
+      - my_network
+
+  frontend:
+    container_name: frontend
+    build:
+      context: .
+      dockerfile: .docker/frontend/vue/Dockerfile
+      target: "development"  # or production
+    volumes:
+      - ./services/frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"  # dev
+      # - "8081:80"  # production
+    networks:
+      - my_network
+
+volumes:
+  auth_pg_data:
+  product_pg_data:
+  redis_data:
+
+
+networks:
+  my_network:
+    driver: bridge
