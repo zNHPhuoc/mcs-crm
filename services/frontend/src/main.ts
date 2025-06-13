@@ -1,5 +1,17 @@
-import { createApp } from 'vue'
-import './style.css'
-import App from './App.vue'
+import { createApp } from 'vue';
+import App from './App.vue';
+import { plugin } from './plugins';
+import type { App as AppVue } from 'vue';
+import router from '@/routes';
 
-createApp(App).mount('#app')
+import './style.css';
+import '@/assets/main.scss';
+
+const bootstrap = async () => {
+  const app: AppVue<Element> = createApp(App);
+  plugin.install(app);
+  await router.isReady();
+  app.mount('#app');
+};
+
+bootstrap();

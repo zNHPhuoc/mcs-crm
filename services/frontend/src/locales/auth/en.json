@@ -1,0 +1,8 @@
+{
+  "email": "Email",
+  "password": "Password",
+  "login": "Login",
+  "logout": "Logout",
+  "register": "Register",
+  "login_title": "Login to your account"
+}

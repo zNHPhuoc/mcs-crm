@@ -1,0 +1,8 @@
+{
+  "email": "メール",
+  "password": "パスワード",
+  "login": "ログイン",
+  "logout": "ログアウト",
+  "register": "登録",
+  "login_title": "アカウントにログインする"
+}
